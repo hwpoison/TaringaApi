@@ -7,6 +7,7 @@ import random
 
 #Script by SrBill / taringa.net/RokerL
 #Script funcional solo para la V7
+shoutss = []
 class TaringApi:
 	def __init__(self):#variables iniciales
 		self.logeado = False
@@ -637,10 +638,18 @@ class TaringApi:
 	@estasLogeado
 	def likearFeedShout(self):#Likea shouts de los recientes
 		shouts_recientes  = self.feedShouts()
+		mensajes = ["Interesante","Muy bueno xD", "Jajajajaja", ":winky",":grin:","auch",":L"]
 		for shout_id in shouts_recientes:
 			print("Likeando el shout ", shout_id[1])
-			self.likearShout(shout_id[1])
-	
+			if(shout_id[1] in shoutss):pass
+			else:
+				shoutss.append(shout_id[1])
+				self.likearShout(shout_id[1]) #likea el shout
+				self.reshoutear(shout_id[1]) #lo reshoutea
+				self.comentarShout(shout_id[1], random.choice(mensajes)) #comenta el shout
+				self.seguirUsuario(shout_id[1].split("/")[3]) #sigue al usuario
+				time.sleep(10) #espera 10 segundos
+		
 
 
 USUARIO = "Acá va el usuario"
