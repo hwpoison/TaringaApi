@@ -6,6 +6,8 @@ import re
 
 #Script funcional solo para la V7
 
+
+
 class TaringApi:
 	def __init__(self):#variables iniciales
 		self.logeado = False
@@ -31,25 +33,43 @@ class TaringApi:
 		self.pagina_dar_unlike = "https://www.taringa.net/serv/shout/unlike"
 		self.pagina_reshoutear = "https://www.taringa.net/serv/shout/reshout"
 		self.pagina_comentarShout = "https://www.taringa.net/serv/comment/add/"
+		self.pagina_votar_shout = "https://www.taringa.net/ajax/shout/vote"
 		self.key_seguridad = None
 		self.id_usuario = None
 		self.usuario_actual = None
 		self.sesion_actual = requests.Session()
+		#Etiquetas de referencia para extraer del html de alguna pagina
+		self.html_regex = {
+			"id_usuario":	"'User_Id', '(.+)', 2 ]", 
+			"id_muro":		"<a obj=\"user\" objid=\"(.+)\" errorContainer",  
+			"id_shout": "\"id\":\"(.+)\",\"url\"",
+			"nickname_usuario": "class=\"hovercard shout-user_name\">(.+)</a>" ,
+			"key_seguridad": "user_key: '(.+)', postid:",
+			"shout_feed_id": "<article class=\"shout-item shout-item_simple  \" id=\"item_(.+)\" data-fetchid",
+			"shout_feed_url": "<li><a href=\"(.+)\" class=\"og-link icon-comments light-shoutbox \"",
+			
+		}
 
 	def peticionPOST(self, url, datos={}):
 		return self.sesion_actual.post(url, data=datos, verify=True)
 	
 	def peticionGET(self, url):
 		return self.sesion_actual.get(url)
-	
+		
+	def extraerDatoHtml(self, etiqueta, codigo):
+		""" Para evitar el uso de bs4 se pasa directamente alguna referencia de la etiqueta 
+		    en formato regex para extraer un dato de la pagina"""
+		return re.findall(etiqueta, str(codigo))
+		
 	def logeado(wrp): #wrapper para verificar que haya una sesion iniciada
 		def verificarLogin(self, *args, **kwargs):
 			if(self.logeado):
 				print("==========================")
-				wrp(self, *args, **kwargs)
+				return wrp(self, *args, **kwargs)
 				print("==========================")
 			else:
 				print("[-]No hay una sesion iniciada o expiro(?)")
+			
 		return verificarLogin
 				
 	def logear(self,usuario,contraseña):#Logear con cuenta en taringa
@@ -68,8 +88,8 @@ class TaringApi:
 			print("[+]Extrayendo key..")
 			if self.key_seguridad is None:
 				code = self.peticionGET(self.pagina_home+"/"+usuario).text
-				self.id_usuario = re.findall("{ user: '(.+)', ", code)[0]
-				self.key_seguridad = re.findall("user_key: '(.+)', postid:", code)[0]
+				self.id_usuario = self.extraerDatoHtml(self.html_regex["id_usuario"], code)[0]
+				self.key_seguridad = self.extraerDatoHtml(self.html_regex["key_seguridad"], code)[0]
 				print("[+]Datos extraidos..")
 				print("[+]Tu key es "+self.key_seguridad[0])
 			self.logeado = True
@@ -84,23 +104,67 @@ class TaringApi:
 			print("[+]Listo")
 			print(deslog.text)
 			
-	def subirArchivoDesdeUrl(self,url):#Subir un archivo al servidor de taringa
-		parametros_subida = {
-			"isImage":"1",
-			"key":self.key_seguridad,
-			"url":url
+	@logeado
+	def enviarMensaje(self,asunto,mensaje,para):#Enviar mensaje a usuario
+		parametros_mensaje = {
+			"captcha":"a",
+			"key": self.key_seguridad,
+			"msgSubject": asunto,
+			"msgText": mensaje,
+			"msgTo": para,
+			"recaptcha":"indefinedd"
 		}
-		if self.logeado:
-			print("[+]Subiendo imagen..")
-			subida = self.sesion_actual.post(self.pagina_subir_imagen,data=parametros_subida,verify=True)
-			if "no valido" in subida.text:
-				print("[-]Error de subida..")
-				return False
-			else:
-				json_img = json.loads(subida.text)
-				url_final = json_img["data"]["url"]
-				tipo_archivo = json_img["data"]["type"]
-				return url_final
+		print("Payload de mensaje:",parametros_mensaje)
+		print("[+]Enviando mensaje..")
+		mensaje = self.sesion_actual.post(self.pagina_enviarMensaje,data=json.dumps(parametros_mensaje), verify=True)
+		print(mensaje.text)
+		if "no valido" in mensaje:
+			print("[-]Error al enviar el mensaje")
+		else:
+			print("[+]El mensaje fue enviado correctamente a "+para)
+	
+	def conseguirIdDeUsuario(self,usuario):
+		codigo_pagina = self.sesion_actual.get(self.pagina_home+"/"+usuario)
+		id_usuario = self.extraerDatoHtml(self.html_regex["id_usuario"], codigo_pagina.text)	
+		if id_usuario:
+			return id_usuario[0]
+		else:
+			return False
+	
+####Acciones de Shouts
+	def conseguirIdMuroDeUsuario(self, usuario):
+		codigo_pagina = self.sesion_actual.get(self.pagina_home+"/"+usuario)
+		id_muro = self.extraerDatoHtml(self.html_regex["id_muro"], str(codigo_pagina.text))
+		if id_muro:
+			return id_muro[0]
+		else:
+			return False
+	
+	def conseguirInfoDeShout(self, url_shout):
+		codigo_pagina = self.sesion_actual.get(url_shout)
+		id_shout = self.extraerDatoHtml(self.html_regex['id_shout'],codigo_pagina.text)	
+		nombre_usuario = self.extraerDatoHtml(self.html_regex['nickname_usuario'],codigo_pagina.text)	
+		id_muro = self.extraerDatoHtml(self.html_regex['id_muro'], codigo_pagina.text)
+		if id_shout:
+			return {'id':id_shout[0],
+					'nombre_usuario':nombre_usuario[0],
+					'id_muro':id_muro[0],
+					}
+		else:
+			return False
+
+	@logeado
+	def votarShout(self, url_shout):
+		info_shout = self.conseguirInfoDeShout(url_shout)
+		parametros_votar = {
+			"key":self.key_seguridad,
+			"uuid":info_shout['id'],
+			"owner":info_shout['id_muro'],
+			"score":1
+		}
+		voto = self.peticionPOST(self.pagina_votar_shout, datos=parametros_votar)
+		print("Mensaje del servidor: " , voto.text)
+		
 	@logeado
 	def shoutear(self,contenido,media_url=None):#Publicar un shout: cuerpo del mensaje / url de contenido(opcional)
 		tipo_contenido = ""
@@ -125,51 +189,6 @@ class TaringApi:
 		print("::::::::::::::::::::::::")
 		print("[+]Mensaje shouteado")
 
-	@logeado
-	def enviarMensaje(self,asunto,mensaje,para):#Enviar mensaje a usuario
-		parametros_mensaje = {
-			"captcha":"a",
-			"key": self.key_seguridad,
-			"msgSubject": asunto,
-			"msgText": mensaje,
-			"msgTo": para,
-			"recaptcha":"indefinedd"
-		}
-		print("Payload de mensaje:",parametros_mensaje)
-		print("[+]Enviando mensaje..")
-		mensaje = self.sesion_actual.post(self.pagina_enviarMensaje,data=json.dumps(parametros_mensaje), verify=True)
-		print(mensaje.text)
-		if "no valido" in mensaje:
-			print("[-]Error al enviar el mensaje")
-		else:
-			print("[+]El mensaje fue enviado correctamente a "+para)
-	
-	def conseguirIdDeUsuario(self,usuario):
-		codigo_pagina = self.sesion_actual.get(self.pagina_home+"/"+usuario)
-		id_usuario = re.findall("'User_Id', '(.+)', 2 ]",str(codigo_pagina.text))	
-		if id_usuario:
-			return id_usuario[0]
-		else:
-			return False
-
-	def conseguirInfoDeShout(self, url_shout):
-		codigo_pagina = self.sesion_actual.get(url_shout)
-		id_shout = re.findall("\"id\":\"(.+)\",\"url\"",str(codigo_pagina.text))	
-		nombre_usuario = re.findall("class=\"hovercard shout-user_name\">(.+)</a>",str(codigo_pagina.text))	
-		if id_shout:
-			return {'id':id_shout[0],
-					'nombre_usuario':nombre_usuario[0]}
-		else:
-			return False
-		
-	def conseguirIdMuroDeUsuario(self, usuario):
-		codigo_pagina = self.sesion_actual.get(self.pagina_home+"/"+usuario)
-		id_muro = re.findall("data-in=\"wall\" data-wall=\"(.+)\">",str(codigo_pagina.text))	
-		if id_muro:
-			return id_muro[0]
-		else:
-			return False
-	
 	@logeado		
 	def shoutearAUsuario(self,usuario,mensaje,media_url=None):#Postear shout en muro de usuario
 		id_muro = self.conseguirIdMuroDeUsuario(usuario)
@@ -199,6 +218,111 @@ class TaringApi:
 			print("[+]Shout publicado en el muro de "+usuario+" correctamente..")
 
 	@logeado
+	def likearShout(self,url_shout=None):#Darle Like a un shout
+		if "https" in url_shout:
+			info_shout = self.conseguirInfoDeShout(url_shout)
+			id_shout = info_shout['id']
+		else:
+			info_shout = None
+			id_shout = url_shout #en caso de que se inserte el id directamente
+		if id_shout:
+			print("[+]Id de shout:"+id_shout)
+		parametros_likearShout  = {
+			"key":self.key_seguridad,
+			"object_id": id_shout,
+		}
+		post =self.peticionPOST(self.pagina_dar_like, datos=parametros_likearShout)
+		print(post.text)
+		print("[+]Se le dio Like al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
+	
+	@logeado
+	def comentarShout(self,url_shout,comentario):#Comentar un shout por url
+		info_shout = self.conseguirInfoDeShout(url_shout)
+		id_shout = info_shout['id']
+		if id_shout:
+			print("[+]Id de shout:"+id_shout)
+		parametros_comentarShout  = {
+			"key":self.key_seguridad,
+			"object_type": 'shout',
+			"body":comentario,
+		}
+		post = self.peticionPOST(self.pagina_comentarShout+id_shout, datos=parametros_comentarShout)
+		print(post.text)
+		print("[+]Se agrego un comentario al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
+	
+	@logeado
+	def reshoutear(self,url_shout):#compartir en el muro un shout
+		info_shout = self.conseguirInfoDeShout(url_shout)
+		id_shout = info_shout['id']
+		if id_shout:
+			print("[+]Id de shout:"+id_shout)
+		parametros_reshoutear  = {
+			"key":self.key_seguridad,
+			"object_id": id_shout,
+		}
+		post = self.peticionPOST(self.pagina_reshoutear, datos=parametros_reshoutear)
+		print(post.text)
+		print("[+]Se reshouteo el shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
+	
+	@logeado
+	def unlikearShout(self,url_shout):#Darle Unlike a un shout
+		info_shout = self.conseguirInfoDeShout(url_shout)
+		id_shout = info_shout['id']
+		if id_shout:
+			print("[+]Id de shout:"+id_shout)
+		parametros_unlikearShout  = {
+			"key":self.key_seguridad,
+			"object_id": id_shout,
+		}
+		post = self.peticionPOST(self.pagina_dar_unlike, datos=parametros_unlikearShout)
+		print(post.text)
+		print("[+]Se le dio Unlike al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
+	
+
+####Acciones generales
+	def subirArchivoDesdeUrl(self,url):#Subir un archivo al servidor de taringa
+		parametros_subida = {
+			"isImage":"1",
+			"key":self.key_seguridad,
+			"url":url
+		}
+		if self.logeado:
+			print("[+]Subiendo imagen..")
+			subida = self.peticionPOST(self.pagina_subir_imagen,datos=parametros_subida)
+			if "no valido" in subida.text:
+				print("[-]Error de subida..")
+				return False
+			else:
+				json_img = json.loads(subida.text)
+				url_final = json_img["data"]["url"]
+				tipo_archivo = json_img["data"]["type"]
+				return url_final
+	
+	@logeado
+	def comentarUnPost(self,post,comentario):#Comentar un post
+		if "http" in post:
+			link_ = post.split("/")
+			link = link_[5]
+			print("	[+]Post a comentar:",link_[6])
+		parametros_comentario = {
+			"comment":comentario,
+			"key":self.key_seguridad,
+			"objectId":link,
+			"objectOwner":self.id_usuario,
+			"objectType":"post",
+			"show":"True"
+		
+		}
+		print(parametros_comentario)
+		comentario = self.peticionPOST(self.pagina_comentarUnPost,datos=parametros_comentario)
+		if "agregado" in str(comentario.text):
+			print("[+]Comentario agregado satisfactoriamente..")
+			print(comentario.text)
+		else:
+			print("[-]Error al agregar el comentario..")
+			print(comentario.text)
+	
+	@logeado
 	def subirImagenEnMiniatura(self,url):#Subir una imagen miniatura para un post
 		print("[+]Subiendo imagen")
 		parametros_subida = {
@@ -222,7 +346,6 @@ class TaringApi:
 		if "url" in url_subida:
 			print("[+]Imagen miniatura subida correctamente:"+url_subida["url"])
 			return url_subida["url"]
-	
 	
 	@logeado
 	def crearPost(self,titulo,contenido,imagen_previa,etiquetas,fuente_contenido,categoria,verificar=False):#Crear y publicar post
@@ -328,65 +451,6 @@ class TaringApi:
 		print("[+]Usuario "+usuario+" seguido.")
 	
 	@logeado
-	def likearShout(self,url_shout):#Darle Like a un shout
-		info_shout = self.conseguirInfoDeShout(url_shout)
-		id_shout = info_shout['id']
-		if id_shout:
-			print("[+]Id de shout:"+id_shout)
-		parametros_likearShout  = {
-			"key":self.key_seguridad,
-			"object_id": id_shout,
-		}
-		post =self.peticionPOST(self.pagina_dar_like, datos=parametros_likearShout)
-		print(post.text)
-		print("[+]Se le dio Like al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
-	
-	
-	@logeado
-	def comentarShout(self,url_shout,comentario):#Comentar un shout por url
-		info_shout = self.conseguirInfoDeShout(url_shout)
-		id_shout = info_shout['id']
-		if id_shout:
-			print("[+]Id de shout:"+id_shout)
-		parametros_comentarShout  = {
-			"key":self.key_seguridad,
-			"object_type": 'shout',
-			"body":comentario,
-		}
-		post = self.peticionPOST(self.pagina_comentarShout+id_shout, datos=parametros_comentarShout)
-		print(post.text)
-		print("[+]Se agrego un comentario al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
-	
-	@logeado
-	def reshoutear(self,url_shout):#compartir en el muro un shout
-		info_shout = self.conseguirInfoDeShout(url_shout)
-		id_shout = info_shout['id']
-		if id_shout:
-			print("[+]Id de shout:"+id_shout)
-		parametros_reshoutear  = {
-			"key":self.key_seguridad,
-			"object_id": id_shout,
-		}
-		post = self.peticionPOST(self.pagina_reshoutear, datos=parametros_reshoutear)
-		print(post.text)
-		print("[+]Se reshouteo el shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
-	
-	@logeado
-	def unlikearShout(self,url_shout):#Darle Unlike a un shout
-		info_shout = self.conseguirInfoDeShout(url_shout)
-		id_shout = info_shout['id']
-		if id_shout:
-			print("[+]Id de shout:"+id_shout)
-		parametros_unlikearShout  = {
-			"key":self.key_seguridad,
-			"object_id": id_shout,
-		}
-		post = self.peticionPOST(self.pagina_dar_unlike, datos=parametros_unlikearShout)
-		print(post.text)
-		print("[+]Se le dio Unlike al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
-	
-	
-	@logeado
 	def dejarDeSeguirUsuario(self,usuario):#No seguir mas a un usuario
 		codigo_pagina = self.peticionGET(self.pagina_home+"/"+usuario)
 		id_muro = self.conseguirIdDeUsuario(usuario)
@@ -464,6 +528,7 @@ class TaringApi:
 		else:
 			print("[-]Denuncia cancelada")
 
+#####Acciones usuarios
 	@logeado
 	def bloquearUsuario(self,usuario):#Bloquear usuario
 		print("[+]Bloqueando usuario")
@@ -493,31 +558,6 @@ class TaringApi:
 		else:
 			print("[-]Error al desbloquear usuario..")
 	
-	
-	@logeado
-	def comentarUnPost(self,post,comentario):#Comentar un post
-		if "http" in post:
-			link_ = post.split("/")
-			link = link_[5]
-			print("	[+]Post a comentar:",link_[6])
-		parametros_comentario = {
-			"comment":comentario,
-			"key":self.key_seguridad,
-			"objectId":link,
-			"objectOwner":self.id_usuario,
-			"objectType":"post",
-			"show":"True"
-		
-		}
-		print(parametros_comentario)
-		comentario = self.peticionPOST(self.pagina_comentarUnPost,datos=parametros_comentario)
-		if "agregado" in str(comentario.text):
-			print("[+]Comentario agregado satisfactoriamente..")
-			print(comentario.text)
-		else:
-			print("[-]Error al agregar el comentario..")
-			print(comentario.text)
-	
 	@logeado
 	def plantilla_solicitud_ajax(self,parametros):#Codigo de muestra 
 		parametros = {
@@ -525,14 +565,36 @@ class TaringApi:
 		}
 		solicitud = self.peticionPOST(link_ajax,datos=parametros)
 
+####Varias
+	@logeado
+	def feed(self):#Lanza la id/url de los shouts mas recientes
+		peticion_feed = self.peticionGET("https://www.taringa.net/shouts/recent")
+		recientes = self.extraerDatoHtml(self.html_regex["shout_feed_id"], peticion_feed.text)
+		url = self.extraerDatoHtml(self.html_regex["shout_feed_url"], peticion_feed.text)
+		shouts = []
+		for a,b in zip(recientes,url):
+			shouts.append((a,b))
+		return shouts
+	
+	def likearFeed(self):#Likea shouts de los recientes
+		shouts_recientes  = self.feed()
+		for shout_id in shouts_recientes:
+			print("Likeando el shout ", shout_id[1])
+			self.likearShout(shout_id[1])
+	
 
-USUARIO = "Aca va el usuario"
-CONTRASEÑA = "Aca va la contra"
+
+
+
+		
+	
+USUARIO = "Aca va el Usuario"
+CONTRASEÑA = "Aca va la contraseña"
 
 if __name__ == "__main__":
 	api = TaringApi()
 	api.logear(USUARIO, CONTRASEÑA)
-	#acciones
-	api.shoutear("Que lindo lenguaje que es python")
+	print(api.shoutear("Que lindo lenguaje que es Python :grin:"))
 	api.deslogear()
+
 
