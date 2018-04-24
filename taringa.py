@@ -24,11 +24,11 @@ class TaringApi:
 		self.pagina_shoutear = "https://www.taringa.net/ajax/shout/add"
 		self.pagina_acciones = "http://www.taringa.net/notificaciones-ajax.php" #seguir
 		self.pagina_denuncia = "http://www.taringa.net/denuncia.php"
-		self.pagina_bloquearUsuario = "http://www.taringa.net/ajax/user/block"
-		self.pagina_subir_miniatura = "http://www.taringa.net/ajax/kn3-signdata.php"
-		self.pagina_agregar_fuente = "http://www.taringa.net/ajax/source/data-add"#
+		self.pagina_bloquearUsuario = "https://www.taringa.net/ajax/user/block"
+		self.pagina_subir_miniatura = "https://www.taringa.net/ajax/kn3-signdata.php"
+		self.pagina_agregar_fuente = "https://www.taringa.net/ajax/source/data-add"#
 		self.pagina_recortar_imagen = "https://apikn3.taringa.net/image/crop"
-		self.pagina_comentarUnPost = "http://www.taringa.net/ajax/comments/add"
+		self.pagina_comentarUnPost = "https://www.taringa.net/ajax/comments/add"
 		self.pagina_dar_like = "https://www.taringa.net/serv/shout/like"
 		self.pagina_dar_unlike = "https://www.taringa.net/serv/shout/unlike"
 		self.pagina_reshoutear = "https://www.taringa.net/serv/shout/reshout"
@@ -47,7 +47,7 @@ class TaringApi:
 			"key_seguridad": "user_key: '(.+)', postid:",
 			"shout_feed_id": "<article class=\"shout-item shout-item_simple  \" id=\"item_(.+)\" data-fetchid",
 			"shout_feed_url": "<li><a href=\"(.+)\" class=\"og-link icon-comments light-shoutbox \"",
-			
+			"post_id":"Comments.objectOwner =  '(.+)';"
 		}
 
 	def peticionPOST(self, url, datos={}):
@@ -299,22 +299,23 @@ class TaringApi:
 				return url_final
 	
 	@logeado
-	def comentarUnPost(self,post,comentario):#Comentar un post
-		if "http" in post:
-			link_ = post.split("/")
-			link = link_[5]
-			print("	[+]Post a comentar:",link_[6])
+	def comentarUnPost(self,url_post,comentario):#Comentar un post
+		if "http" in url_post:
+			post = self.peticionGET(url_post).text
+			id_post = url_post.split("/")[5]
+			id_objeto = self.extraerDatoHtml(self.html_regex["post_id"], post)[0]
+			print("	[+]Post a comentar:",url_post)
 		parametros_comentario = {
 			"comment":comentario,
 			"key":self.key_seguridad,
-			"objectId":link,
-			"objectOwner":self.id_usuario,
+			"objectId":id_post,
+			"objectOwner":id_objeto,
 			"objectType":"post",
 			"show":"True"
 		
 		}
-		print(parametros_comentario)
 		comentario = self.peticionPOST(self.pagina_comentarUnPost,datos=parametros_comentario)
+		print("Mensaje Post:", comentario.text)
 		if "agregado" in str(comentario.text):
 			print("[+]Comentario agregado satisfactoriamente..")
 			print(comentario.text)
@@ -557,14 +558,6 @@ class TaringApi:
 			print("[+]%s fue desbloqueado"%usuario)
 		else:
 			print("[-]Error al desbloquear usuario..")
-	
-	@logeado
-	def plantilla_solicitud_ajax(self,parametros):#Codigo de muestra 
-		parametros = {
-		
-		}
-		solicitud = self.peticionPOST(link_ajax,datos=parametros)
-
 ####Varias
 	@logeado
 	def feed(self):#Lanza la id/url de los shouts mas recientes
@@ -584,17 +577,15 @@ class TaringApi:
 	
 
 
-
-
-		
-	
-USUARIO = "Aca va el Usuario"
-CONTRASEÑA = "Aca va la contraseña"
+USUARIO = "rokerl"
+CONTRASEÑA = "rokerltaringa96"
 
 if __name__ == "__main__":
 	api = TaringApi()
 	api.logear(USUARIO, CONTRASEÑA)
-	print(api.shoutear("Que lindo lenguaje que es Python :grin:"))
+	print(api.conseguirIdDeUsuario("RokerL"))
+	api.comentarUnPost("https://www.taringa.net/posts/noticias/20173332/Maria-Eugenia-Vidal-Les-garantizamos-a-los-docentes-que-le.html", "le doy")
 	api.deslogear()
+
 
 
