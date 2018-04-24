@@ -1,13 +1,13 @@
+import sys
+
 import requests 
 import time
-import sys
 import json
 import re
 import random
 
 #Script by SrBill / taringa.net/RokerL
 #Script funcional solo para la V7
-shoutss = []
 class TaringApi:
 	def __init__(self):#variables iniciales
 		self.logeado = False
@@ -37,6 +37,8 @@ class TaringApi:
 		self.pagina_posts_recientes = "https://www.taringa.net/posts/recientes"
 		self.pagina_posts_ascenso = "https://www.taringa.net/posts/ascenso"
 		self.pagina_puntuar_post = "https://www.taringa.net/ajax/post/vote"
+		self.pagina_shouts_recientes = "https://www.taringa.net/shouts/recent"
+		self.pagina_shouts_mi = "https://www.taringa.net/mi"
 		self.key_seguridad = None
 		self.id_usuario = None
 		self.usuario_actual = None
@@ -49,13 +51,16 @@ class TaringApi:
 			"id_shout": "\"id\":\"(.+)\",\"url\"",
 			"nickname_usuario": "class=\"hovercard shout-user_name\">(.+)</a>" ,
 			"key_seguridad": "user_key: '(.+)', postid:",
-			"shout_feed_id": "<article class=\"shout-item shout-item_simple  \" id=\"item_(.+)\" data-fetchid",
-			"shout_feed_url": "<li><a href=\"(.+)\" class=\"og-link icon-comments light-shoutbox \"",
+			"shout_feed_recientes_id": "<article class=\"shout-item shout-item_simple  \" id=\"item_(.+)\" data-fetchid",
+			"shout_feed_recientes_url": "<li><a href=\"(.+)\" class=\"og-link icon-comments light-shoutbox \"",
+			"shout_feed_mi_id":"this,'shout',(.+),",
+			"shout_feed_mi_url":"<a href=\"(.+)\" title=\"",
+			
 			"post_id":"Comments.objectOwner =  '(.+)';",
 			"posts_feed_url": "<a href=\"(.+)\" class=\"avatar list-l__avatar\">",
 	
 		}
-
+		self.buffer_ = []
 	def peticionPOST(self, url, datos={}):
 		return self.sesion_actual.post(url, data=datos, verify=True)
 	
@@ -604,13 +609,25 @@ class TaringApi:
 			print("[-]Error al desbloquear usuario..")
 ####Varias
 	@estasLogeado
-	def feedShouts(self):#Lanza la id/url de los shouts mas recientes
-		peticion_feed = self.peticionGET("https://www.taringa.net/shouts/recent")
-		recientes = self.extraerDatoHtml(self.html_regex["shout_feed_id"], peticion_feed.text)
-		url = self.extraerDatoHtml(self.html_regex["shout_feed_url"], peticion_feed.text)
+	def feedShouts(self, tipo="recientes"):#Lanza la id/url de los shouts mas recientes
+		if tipo == "recientes":
+			regex_id = self.html_regex["shout_feed_recientes_id"]
+			regex_url = self.html_regex["shout_feed_recientes_url"]
+			url_shouts = self.pagina_shouts_recientes
+		elif tipo =="mi":
+			regex_id = self.html_regex["shout_feed_mi_id"]
+			regex_url = self.html_regex["shout_feed_mi_url"]
+			url_shouts =  self.pagina_shouts_mi 
+		
+		peticion_feed = self.peticionGET(url_shouts)
+		recientes = self.extraerDatoHtml(regex_id, str(peticion_feed.text))
+		url = self.extraerDatoHtml(regex_url, peticion_feed.text)
 		shouts = []
-		for a,b in zip(recientes,url):
-			shouts.append((a,b))
+		for Id,url in zip(recientes,url):
+			if "https" in url:
+				shouts.append((Id,url))
+			else:
+				shouts.append((Id,"https://www.taringa.net"+url))
 		return shouts
 
 	@estasLogeado
@@ -636,21 +653,20 @@ class TaringApi:
 			time.sleep(45)
 			
 	@estasLogeado
-	def likearFeedShout(self):#Likea shouts de los recientes
-		shouts_recientes  = self.feedShouts()
+	def likearFeedShout(self,tipo="mi"):#Likea shouts de los recientes
+		shouts_recientes  = self.feedShouts(tipo)
 		mensajes = ["Interesante","Muy bueno xD", "Jajajajaja", ":winky",":grin:","auch",":L"]
 		for shout_id in shouts_recientes:
 			print("Likeando el shout ", shout_id[1])
-			if(shout_id[1] in shoutss):pass
+			if(shout_id[1] in self.buffer_):pass
 			else:
-				shoutss.append(shout_id[1])
+				self.buffer_.append(shout_id[1])
 				self.likearShout(shout_id[1]) #likea el shout
 				self.reshoutear(shout_id[1]) #lo reshoutea
 				self.comentarShout(shout_id[1], random.choice(mensajes)) #comenta el shout
 				self.seguirUsuario(shout_id[1].split("/")[3]) #sigue al usuario
-				time.sleep(10) #espera 10 segundos
+				time.sleep(35) #espera 10 segundos
 		
-
 
 USUARIO = "Acá va el usuario"
 CONTRASEÑA = "Acá va la contraseña"
