@@ -2,6 +2,7 @@ import requests
 import time
 import json
 import re
+import random
 
 #Script by SrBill / taringa.net/RokerL
 #Script funcional solo para la V7
@@ -33,6 +34,7 @@ class TaringApi:
 		self.pagina_votar_shout = "https://www.taringa.net/ajax/shout/vote"
 		self.pagina_posts_recientes = "https://www.taringa.net/posts/recientes"
 		self.pagina_posts_ascenso = "https://www.taringa.net/posts/ascenso"
+		self.pagina_puntuar_post = "https://www.taringa.net/ajax/post/vote"
 		self.key_seguridad = None
 		self.id_usuario = None
 		self.usuario_actual = None
@@ -48,7 +50,8 @@ class TaringApi:
 			"shout_feed_id": "<article class=\"shout-item shout-item_simple  \" id=\"item_(.+)\" data-fetchid",
 			"shout_feed_url": "<li><a href=\"(.+)\" class=\"og-link icon-comments light-shoutbox \"",
 			"post_id":"Comments.objectOwner =  '(.+)';",
-			"posts_feed_url": "<a href=\"(.+)\" class=\"avatar list-l__avatar\">"
+			"posts_feed_url": "<a href=\"(.+)\" class=\"avatar list-l__avatar\">",
+	
 		}
 
 	def peticionPOST(self, url, datos={}):
@@ -539,6 +542,28 @@ class TaringApi:
 		else:
 			print("[-]Denuncia cancelada")
 
+	def votarPost(self, url_post, cantidad_puntos=10):
+		print("[+]Puntuando ", url_post)
+		if "http" in url_post:
+			id_post = url_post.split("/")[5]
+			peticion_token = self.recode(self.peticionGET(url_post).text)
+			regex = str(cantidad_puntos) + ", '(.+)'\)\" class=\"require-login\""
+			token = self.extraerDatoHtml(regex, peticion_token)
+		else:
+			return False
+		if token:
+			token = token[0]
+		else:
+			print("[-]No se pudo obtener el token o no tienes mas puntos para dar hoy.")
+		parametros_puntuar = {
+				"key":self.key_seguridad,
+				"puntos":cantidad_puntos,
+				"x":token,
+				"postid":id_post,
+		}
+		puntuacion = self.peticionPOST(self.pagina_puntuar_post, datos=parametros_puntuar)
+		print("Mensaje servidor:", puntuacion.text)
+		return 
 #####Acciones usuarios
 	@estasLogeado
 	def bloquearUsuario(self,usuario):#Bloquear usuario
@@ -596,11 +621,11 @@ class TaringApi:
 	
 	@estasLogeado
 	def comentarFeedPost(self, comentario, url_imagen=None): #comentar los posts de una pagina principal
-		posts = self.feedPost()
+		posts = self.feedPost(tipo="recientes")
 		for post in posts:
 			print("Comentando el post ", post)
 			self.comentarUnPost(post, comentario, url_imagen)
-			time.sleep(30)
+			time.sleep(45)
 			
 	@estasLogeado
 	def likearFeedShout(self):#Likea shouts de los recientes
@@ -617,6 +642,7 @@ CONTRASEÑA = "Acá va la contraseña"
 if __name__ == "__main__":
 	api = TaringApi()
 	api.logear(USUARIO, CONTRASEÑA)
-	api.shoutear("Python is Love :winky: :grin:")
+	api.shoutear("Python is Love <3")
+	api.votarPost("https://www.taringa.net/posts/linux/19401863/Python-Controlar-funciones-taringa-Act-2018.html", cantidad_puntos=5)
 	api.deslogear()
-	
+
