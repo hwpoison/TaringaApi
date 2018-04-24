@@ -1,5 +1,6 @@
 import requests 
 import time
+import sys
 import json
 import re
 import random
@@ -72,7 +73,10 @@ class TaringApi:
 		def verificarLogin(self, *args, **kwargs):
 			if(self.logeado):
 				print("==========================")
-				return wrp(self, *args, **kwargs)
+				try:
+					return wrp(self, *args, **kwargs)
+				except Exception:
+					print("Ocurrió un error desconocido:", sys.exc_info()[1])
 				print("==========================")
 			else:
 				print("[-]No hay una sesion iniciada o expiro(?)")
@@ -152,7 +156,7 @@ class TaringApi:
 		id_shout = self.extraerDatoHtml(self.html_regex['id_shout'],codigo_pagina.text)	
 		nombre_usuario = self.extraerDatoHtml(self.html_regex['nickname_usuario'],codigo_pagina.text)	
 		id_muro = self.extraerDatoHtml(self.html_regex['id_muro'], codigo_pagina.text)
-		if id_muro == []:id_muro = [""]
+		#~ if id_muro == []:id_muro = [""]
 		if id_shout:
 			return {'id':id_shout[0],
 					'nombre_usuario':nombre_usuario[0],
@@ -244,8 +248,10 @@ class TaringApi:
 			"object_id": id_shout,
 		}
 		post =self.peticionPOST(self.pagina_dar_like, datos=parametros_likearShout)
-		print(post.text)
-		print("[+]Se le dio Like al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
+		if "successfully" in str(post.text):
+			print("[+]Se le dio Like al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
+		else:
+			print("[-]Error al dar Likeal shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
 	
 	@estasLogeado
 	def comentarShout(self,url_shout,comentario):#Comentar un shout por url
@@ -646,4 +652,5 @@ if __name__ == "__main__":
 	api.shoutear("Python is Love <3")
 	api.votarPost("https://www.taringa.net/posts/linux/19401863/Python-Controlar-funciones-taringa-Act-2018.html", cantidad_puntos=5)
 	api.deslogear()
-
+	
+#24/04/2018
