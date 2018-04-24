@@ -87,7 +87,7 @@ class TaringApi:
 				self.id_usuario = self.extraerDatoHtml(self.html_regex["id_usuario_propio"], code)[0]
 				self.key_seguridad = self.extraerDatoHtml(self.html_regex["key_seguridad"], code)[0]
 				print("[+]Datos extraidos..")
-				print("[+]Tu key es "+self.key_seguridad[0])
+				print("[+]Tu key es "+self.key_seguridad)
 			self.logeado = True
 		else:
 			print("[+]Fallo el logeo")
@@ -588,5 +588,3 @@ if __name__ == "__main__":
 	api.logear(USUARIO, CONTRASEÑA)
 	api.shoutear("Python is Love <3")
 	api.deslogear()
-
-
