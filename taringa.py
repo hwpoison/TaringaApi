@@ -1,6 +1,8 @@
 import requests 
+import time
 import json
 import re
+
 #Script by SrBill / taringa.net/RokerL
 #Script funcional solo para la V7
 class TaringApi:
@@ -29,6 +31,8 @@ class TaringApi:
 		self.pagina_reshoutear = "https://www.taringa.net/serv/shout/reshout"
 		self.pagina_comentarShout = "https://www.taringa.net/serv/comment/add/"
 		self.pagina_votar_shout = "https://www.taringa.net/ajax/shout/vote"
+		self.pagina_posts_recientes = "https://www.taringa.net/posts/recientes"
+		self.pagina_posts_ascenso = "https://www.taringa.net/posts/ascenso"
 		self.key_seguridad = None
 		self.id_usuario = None
 		self.usuario_actual = None
@@ -43,12 +47,16 @@ class TaringApi:
 			"key_seguridad": "user_key: '(.+)', postid:",
 			"shout_feed_id": "<article class=\"shout-item shout-item_simple  \" id=\"item_(.+)\" data-fetchid",
 			"shout_feed_url": "<li><a href=\"(.+)\" class=\"og-link icon-comments light-shoutbox \"",
-			"post_id":"Comments.objectOwner =  '(.+)';"
+			"post_id":"Comments.objectOwner =  '(.+)';",
+			"posts_feed_url": "<a href=\"(.+)\" class=\"avatar list-l__avatar\">"
 		}
 
 	def peticionPOST(self, url, datos={}):
 		return self.sesion_actual.post(url, data=datos, verify=True)
 	
+	def recode(self, text): #para el Error de chrmap
+		return str(text).encode("utf-8").decode("utf-8")
+		
 	def peticionGET(self, url):
 		return self.sesion_actual.get(url)
 		
@@ -278,7 +286,6 @@ class TaringApi:
 		print(post.text)
 		print("[+]Se le dio Unlike al shout "+ id_shout + " del usuario " + info_shout['nombre_usuario'] )
 	
-
 ####Acciones generales
 	def subirArchivoDesdeUrl(self,url):#Subir un archivo al servidor de taringa
 		parametros_subida = {
@@ -299,12 +306,14 @@ class TaringApi:
 				return url_final
 	
 	@estasLogeado
-	def comentarUnPost(self,url_post,comentario):#Comentar un post
+	def comentarUnPost(self,url_post,comentario, url_imagen=None):#Comentar un post
 		if "http" in url_post:
 			post = self.peticionGET(url_post).text
 			id_post = url_post.split("/")[5]
 			id_objeto = self.extraerDatoHtml(self.html_regex["post_id"], post)[0]
 			print("	[+]Post a comentar:",url_post)
+		if url_imagen:
+			comentario = comentario + "[img="+url_imagen+"]"
 		parametros_comentario = {
 			"comment":comentario,
 			"key":self.key_seguridad,
@@ -470,7 +479,7 @@ class TaringApi:
 		print("[+]Usuario "+usuario+" no seguido")
 	
 	@estasLogeado
-	def denuncuarPost(self,post,razon,aclaracion,preguntar=False):#Denunciar un post
+	def denunciarPost(self,post,razon,aclaracion,preguntar=False):#Denunciar un post
 		print("[+]Iniciando denuncia..")
 		razones = {
 			"ofensivo":"108",
@@ -562,7 +571,7 @@ class TaringApi:
 			print("[-]Error al desbloquear usuario..")
 ####Varias
 	@estasLogeado
-	def feed(self):#Lanza la id/url de los shouts mas recientes
+	def feedShouts(self):#Lanza la id/url de los shouts mas recientes
 		peticion_feed = self.peticionGET("https://www.taringa.net/shouts/recent")
 		recientes = self.extraerDatoHtml(self.html_regex["shout_feed_id"], peticion_feed.text)
 		url = self.extraerDatoHtml(self.html_regex["shout_feed_url"], peticion_feed.text)
@@ -570,21 +579,44 @@ class TaringApi:
 		for a,b in zip(recientes,url):
 			shouts.append((a,b))
 		return shouts
+
+	@estasLogeado
+	def feedPost(self, tipo="home", pagina=0): #Lista de posts en su categoria reciente por defecto
+		if tipo == "recientes":
+			url_posts = self.pagina_posts_recientes
+		elif tipo == "ascenso":
+			url_posts = self.pagina_posts_ascenso
+		else:
+			url_posts = self.pagina_home
+		if pagina:
+			url_posts = url_posts+"/pagina"+pagina
+		peticion_posts = self.peticionGET(url_posts).text
+		recientes = self.extraerDatoHtml(self.html_regex["posts_feed_url"], self.recode(peticion_posts))
+		return recientes
 	
 	@estasLogeado
-	def likearFeed(self):#Likea shouts de los recientes
-		shouts_recientes  = self.feed()
+	def comentarFeedPost(self, comentario, url_imagen=None): #comentar los posts de una pagina principal
+		posts = self.feedPost()
+		for post in posts:
+			print("Comentando el post ", post)
+			self.comentarUnPost(post, comentario, url_imagen)
+			time.sleep(30)
+			
+	@estasLogeado
+	def likearFeedShout(self):#Likea shouts de los recientes
+		shouts_recientes  = self.feedShouts()
 		for shout_id in shouts_recientes:
 			print("Likeando el shout ", shout_id[1])
 			self.likearShout(shout_id[1])
 	
 
 
-USUARIO = "Aca va el usuario"
-CONTRASEÑA = "Aca va la contraseña"
+USUARIO = "Acá va el usuario"
+CONTRASEÑA = "Acá va la contraseña"
 
 if __name__ == "__main__":
 	api = TaringApi()
 	api.logear(USUARIO, CONTRASEÑA)
-	api.shoutear("Python is Love <3")
+	api.shoutear("Python is Love :winky: :grin:")
 	api.deslogear()
+	
