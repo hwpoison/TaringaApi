@@ -1,13 +1,8 @@
 import requests 
 import json
 import re
-
 #Script by SrBill / taringa.net/RokerL
-
 #Script funcional solo para la V7
-
-
-
 class TaringApi:
 	def __init__(self):#variables iniciales
 		self.logeado = False
@@ -167,12 +162,15 @@ class TaringApi:
 		
 	@logeado
 	def shoutear(self,contenido,media_url=None):#Publicar un shout: cuerpo del mensaje / url de contenido(opcional)
-		tipo_contenido = ""
+		tipo_contenido = "1"
 		if media_url:
-			if "youtu" in media_url:tipo_contenido = "2"
-			else:tipo_contenido = "1"
-			if "kn3" in media_url:url_subida = media_url#SI ya esta subido a taringa
-			else:url_subida = self.subirArchivoDesdeUrl(media_url)
+			if "youtu" in media_url:
+				tipo_contenido = "2"
+			if "kn3" in media_url:
+				url_subida = media_url#SI ya esta subido a taringa
+			else:
+				url_subida = self.subirArchivoDesdeUrl(media_url)
+				
 		else:url_subida = ""
 		parametros_shout = {
 				"attachment":url_subida,
@@ -181,6 +179,7 @@ class TaringApi:
 				"key":self.key_seguridad,
 				"privacy":"0"
 		}
+		print(parametros_shout)
 		shout = self.peticionPOST(self.pagina_shoutear, datos=parametros_shout)
 		print("Informacion de POST:",shout.text)
 		print("Shout creado::::::::::::")
@@ -210,7 +209,7 @@ class TaringApi:
 				"wall":id_muro
 			}
 			print(parametros_shoutear_muro)
-		shout = self.peticionPOST(self.pagina_shoutear_en_muro,datos=parametros_shoutear_muroe)
+		shout = self.peticionPOST(self.pagina_shoutear_en_muro,datos=parametros_shoutear_muro)
 		print(shout.text)
 		if "No puedes" in shout.text:
 			print("[-]Error al postear el shout en el muro del usuario "+usuario)
@@ -577,15 +576,13 @@ class TaringApi:
 	
 
 
-USUARIO = "rokerl"
-CONTRASEÑA = "rokerltaringa96"
+USUARIO = "Aca va el usuario"
+CONTRASEÑA = "Aca va la contraseña"
 
 if __name__ == "__main__":
 	api = TaringApi()
 	api.logear(USUARIO, CONTRASEÑA)
-	print(api.conseguirIdDeUsuario("RokerL"))
-	api.comentarUnPost("https://www.taringa.net/posts/noticias/20173332/Maria-Eugenia-Vidal-Les-garantizamos-a-los-docentes-que-le.html", "le doy")
+	api.shoutear("Que lindo lenguaje es Python :winky:")
 	api.deslogear()
-
 
 
