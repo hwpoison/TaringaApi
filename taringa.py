@@ -152,6 +152,7 @@ class TaringApi:
 		id_shout = self.extraerDatoHtml(self.html_regex['id_shout'],codigo_pagina.text)	
 		nombre_usuario = self.extraerDatoHtml(self.html_regex['nickname_usuario'],codigo_pagina.text)	
 		id_muro = self.extraerDatoHtml(self.html_regex['id_muro'], codigo_pagina.text)
+		if id_muro == []:id_muro = [""]
 		if id_shout:
 			return {'id':id_shout[0],
 					'nombre_usuario':nombre_usuario[0],
