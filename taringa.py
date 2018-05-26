@@ -667,6 +667,16 @@ class TaringApi:
 				self.seguirUsuario(shout_id[1].split("/")[3]) #sigue al usuario
 				time.sleep(35) #espera 10 segundos
 		
+	@estasLogeado
+	def seguirUsuarios(self,tipo="mi"):#Likea shouts de los recientes
+		shouts_recientes  = self.feedShouts(tipo)
+		for shout_id in shouts_recientes:
+			print("Siguiendo usuario ", shout_id[1])
+			if(shout_id[1] in self.buffer_):pass
+			else:
+				self.buffer_.append(shout_id[1])
+				self.seguirUsuario(shout_id[1].split("/")[3]) #sigue al usuario
+		
 
 USUARIO = "Acá va el usuario"
 CONTRASEÑA = "Acá va la contraseña"
@@ -674,8 +684,9 @@ CONTRASEÑA = "Acá va la contraseña"
 if __name__ == "__main__":
 	api = TaringApi()
 	api.logear(USUARIO, CONTRASEÑA)
-	api.shoutear("Python is Love <3")
-	api.votarPost("https://www.taringa.net/posts/linux/19401863/Python-Controlar-funciones-taringa-Act-2018.html", cantidad_puntos=5)
+	#FUNCIONES A EJECUTAR
+	api.seguirUsuarios()
+	#FIN DE FUNCIONES A EJECUTAR
 	api.deslogear()
 	
-#24/04/2018
+#26/05/2018
