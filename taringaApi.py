@@ -678,15 +678,7 @@ class TaringApi:
 				self.seguirUsuario(shout_id[1].split("/")[3]) #sigue al usuario
 		
 
-USUARIO = "Acá va el usuario"
-CONTRASEÑA = "Acá va la contraseña"
 
 if __name__ == "__main__":
-	api = TaringApi()
-	api.logear(USUARIO, CONTRASEÑA)
-	#FUNCIONES A EJECUTAR
-	api.seguirUsuarios()
-	#FIN DE FUNCIONES A EJECUTAR
-	api.deslogear()
-	
-#26/05/2018
+	pass
+
