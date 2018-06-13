@@ -13,7 +13,7 @@ Algunas de las funciones disponibles:
 *subirArchivoDesdeUrl(url_archivo)*<br />
 *crearPost()*<br />
 *comentarUnPost(url_post)*<br />
-*votarShout(url_shout)*<br /><br />
+*votarShout(url_shout)*<br />
 *denunciarPost(post,razon,aclaracion, preguntar)*<br />
 *bloquearUsuario(nick) *<br />
 *desbloquearUsuario(nick)*<br />
